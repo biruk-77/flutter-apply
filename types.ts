@@ -28,18 +28,21 @@ export interface JobListing {
   location: string;
   email: string | null;
   snippet: string;
+  fullDescription: string;
   url: string | null;
+  sourceSite: string; // e.g., "LinkedIn", "Indeed", "Company Website"
 }
 
 export interface FoundEmail {
   email: string;
   type: 'recruitment' | 'personal' | 'general' | 'unknown';
-  name?: string; // The person's name or department name
-  role?: string; // e.g., CEO, Founder, Recruiter, CTO
-  company?: string; // The company name
-  industry?: string; // e.g. Fintech, Healthcare
-  snippet?: string; // Short context about why they are relevant or where found
-  source?: string; // Where it might have been found (context)
+  name?: string; 
+  role?: string; 
+  company?: string; 
+  industry?: string; 
+  snippet?: string; 
+  source?: string; 
+  sourceUrl?: string; 
 }
 
 export type StreamUpdate = 

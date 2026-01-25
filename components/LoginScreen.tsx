@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { isConfigValid } from '../firebaseConfig';
 import { Button } from './ui/Button';
-import { LogIn, Sparkles, AlertTriangle, ExternalLink, Copy, HelpCircle, Mail, Lock, UserPlus } from 'lucide-react';
+import { LogIn, Sparkles, AlertTriangle, ExternalLink, Copy, HelpCircle, Mail, Lock, UserPlus, Globe } from 'lucide-react';
 
 export const LoginScreen: React.FC = () => {
   const { signInWithGoogle, loginWithEmail, registerWithEmail } = useAuth();
@@ -17,7 +17,15 @@ export const LoginScreen: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
-    setCurrentDomain(window.location.hostname);
+    // Robust domain detection
+    const getHost = () => {
+      try {
+        return window.location.hostname || window.location.host || new URL(window.location.href).hostname;
+      } catch (e) {
+        return "your-preview-domain.com";
+      }
+    };
+    setCurrentDomain(getHost());
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -75,8 +83,9 @@ export const LoginScreen: React.FC = () => {
     } else if (err.code === 'auth/configuration-not-found' || err.code === 'auth/api-key-not-valid' || err.code === 'auth/internal-error') {
       msg = "Firebase configuration is missing or invalid. Please check firebaseConfig.ts.";
     } else if (err.code === 'auth/unauthorized-domain') {
-      // Special complex UI for unauthorized domain
-      const domain = window.location.hostname;
+      // Use currentDomain state or direct window access
+      const domain = currentDomain || window.location.hostname || "unknown-domain";
+      
       setError(
         <div className="flex flex-col items-start w-full text-left bg-red-50 p-4 rounded-lg border border-red-100 animate-in fade-in zoom-in-95 duration-300">
           <h3 className="font-bold text-red-700 mb-2 flex items-center gap-2">
@@ -92,9 +101,11 @@ export const LoginScreen: React.FC = () => {
               STEP 1: COPY THIS
             </div>
             <div className="flex items-center gap-2 mt-2">
-              <code className="flex-1 font-mono font-bold text-slate-800 text-lg break-all select-all border-b border-dashed border-slate-300 pb-0.5">
-                {domain}
-              </code>
+              <div className="flex-1 bg-slate-50 p-2 rounded border border-dashed border-slate-200 overflow-hidden">
+                <code className="block font-mono font-bold text-slate-800 text-sm break-all select-all">
+                  {domain}
+                </code>
+              </div>
               <button 
                 onClick={() => {
                   navigator.clipboard.writeText(domain);
@@ -102,7 +113,7 @@ export const LoginScreen: React.FC = () => {
                   if (btn) btn.innerText = 'Copied!';
                   setTimeout(() => { if (btn) btn.innerText = 'Copy'; }, 2000);
                 }}
-                className="flex items-center gap-1 text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-1 text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm active:scale-95 shrink-0"
               >
                 <Copy className="w-4 h-4" /> 
                 <span id="copy-btn-text">Copy</span>
@@ -122,18 +133,17 @@ export const LoginScreen: React.FC = () => {
               </li>
               <li>Go to <strong>Authentication</strong> &gt; <strong>Settings</strong> &gt; <strong>Authorized Domains</strong> tab.</li>
               <li>Click the blue <strong>Add domain</strong> button.</li>
-              <li>Paste the domain from Step 1.</li>
+              <li>Paste the domain from Step 1 and Save.</li>
             </ol>
           </div>
         </div>
       );
-      return; // Return early so we don't overwrite the complex error component
+      return;
     }
 
     setError(msg);
   };
 
-  // If configuration is still using placeholders, show the Setup Guide
   if (!isConfigValid) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
@@ -327,11 +337,11 @@ export const LoginScreen: React.FC = () => {
           {/* Persistent Debug Info */}
           <div className="mt-8 pt-6 border-t border-slate-100">
             <div className="flex items-center justify-center gap-1 text-xs text-slate-400">
-              <HelpCircle className="w-3 h-3" />
+              <Globe className="w-3 h-3" />
               <span>Current Preview Domain:</span>
             </div>
-            <code className="block mt-1 text-center text-xs bg-slate-100 p-2 rounded text-slate-500 font-mono select-all">
-              {currentDomain || 'Loading...'}
+            <code className="block mt-1 text-center text-[10px] bg-slate-100 p-2 rounded text-slate-500 font-mono select-all break-all border border-slate-200">
+              {currentDomain || 'Detecting...'}
             </code>
           </div>
 
