@@ -1,182 +1,182 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserProfile, AppTab } from './types';
-import { ProfileTab } from './components/ProfileTab';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AppTab, UserProfile } from './types';
+import { getUserProfile, saveUserProfile } from './services/dbService';
 import { GeneratorTab } from './components/GeneratorTab';
 import { EmailFinderTab } from './components/EmailFinderTab';
+import { ProfileTab } from './components/ProfileTab';
 import { LoginScreen } from './components/LoginScreen';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { getUserProfile, saveUserProfile } from './services/dbService';
-import { Layout, PenTool, UserCircle, Search, LogOut } from 'lucide-react';
+import { 
+  Briefcase, 
+  Search, 
+  User, 
+  LogOut, 
+  LayoutDashboard, 
+  Sparkles,
+  ChevronLeft,
+  Menu
+} from 'lucide-react';
 
 const DEFAULT_PROFILE: UserProfile = {
   name: '',
   email: '',
   yearsExperience: '',
-  skills: '',
+  skills: 'Dart, Flutter, Firebase',
   portfolioUrl: '',
   bio: '',
   linkedinUrl: ''
 };
 
-// Internal component to handle authenticated logic
 const Dashboard: React.FC = () => {
   const { currentUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.GENERATOR);
-  const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
-  // Load profile from Firestore when user logs in
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!currentUser) return;
-      try {
-        const profile = await getUserProfile(currentUser.uid);
-        if (profile) {
-          setUserProfile(profile);
+    const loadProfile = async () => {
+      if (currentUser) {
+        setIsLoadingProfile(true);
+        const data = await getUserProfile(currentUser.uid);
+        if (data) {
+          setProfile(data);
         } else {
-          // Initialize with email if new
-          setUserProfile(prev => ({ ...prev, email: currentUser.email || '' }));
+          // Initialize with default if nothing found
+          setProfile({ ...DEFAULT_PROFILE, email: currentUser.email || '' });
         }
-      } catch (e) {
-        console.error("Failed to fetch profile", e);
-      } finally {
         setIsLoadingProfile(false);
       }
     };
-
-    fetchProfile();
+    loadProfile();
   }, [currentUser]);
 
-  const handleSaveProfile = async (profile: UserProfile) => {
-    if (!currentUser) return;
-    setUserProfile(profile);
-    // Save to Firestore
-    await saveUserProfile(currentUser.uid, profile);
+  const handleSaveProfile = async (newProfile: UserProfile) => {
+    if (currentUser) {
+      await saveUserProfile(currentUser.uid, newProfile);
+      setProfile(newProfile);
+    }
   };
 
-  const hasProfileName = userProfile.name && userProfile.name.length > 0;
+  const navItems = [
+    { id: AppTab.GENERATOR, label: 'Job Generator', icon: Briefcase },
+    { id: AppTab.EMAIL_FINDER, label: 'Email Finder', icon: Search },
+    { id: AppTab.PROFILE, label: 'My Profile', icon: User },
+  ];
 
   if (isLoadingProfile) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="h-12 w-12 bg-blue-200 rounded-full mb-4"></div>
-          <div className="h-4 w-32 bg-slate-200 rounded"></div>
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium">Loading your workspace...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-1.5 rounded-lg">
-               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            </div>
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight hidden sm:block">Flutter<span className="text-blue-600">Apply</span> AI</h1>
+    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
+      {/* Sidebar Navigation */}
+      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20`}>
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <div className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>
+            <Sparkles className="w-6 h-6 text-blue-600 shrink-0" />
+            <h1 className="font-bold text-xl tracking-tight whitespace-nowrap">Flutter<span className="text-blue-600">Apply</span></h1>
           </div>
-
-          <nav className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-            <button
-              onClick={() => setActiveTab(AppTab.GENERATOR)}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === AppTab.GENERATOR
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <PenTool className="w-4 h-4" />
-              <span className="hidden sm:inline">Write Email</span>
-            </button>
-            <button
-              onClick={() => setActiveTab(AppTab.EMAIL_FINDER)}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === AppTab.EMAIL_FINDER
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <Search className="w-4 h-4" />
-              <span className="hidden sm:inline">Find Emails</span>
-            </button>
-            <button
-              onClick={() => setActiveTab(AppTab.PROFILE)}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === AppTab.PROFILE
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <UserCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">Profile</span>
-              {!hasProfileName && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
-            </button>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <button onClick={logout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Sign Out">
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Warning if no profile */}
-        {activeTab === AppTab.GENERATOR && !hasProfileName && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="bg-amber-100 p-2 rounded-full text-amber-600">
-                <UserCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="font-medium text-amber-900">Your profile is empty</p>
-                <p className="text-sm text-amber-700">Set up your profile to generate personalized emails.</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => setActiveTab(AppTab.PROFILE)}
-              className="px-4 py-2 bg-white border border-amber-300 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-50 transition-colors"
-            >
-              Go to Profile
-            </button>
-          </div>
-        )}
-
-        {/* Tab Content */}
-        <div className="animate-in fade-in duration-300 slide-in-from-bottom-2 h-full">
-          {activeTab === AppTab.GENERATOR && <GeneratorTab userProfile={userProfile} />}
-          {activeTab === AppTab.EMAIL_FINDER && <EmailFinderTab userProfile={userProfile} />}
-          {activeTab === AppTab.PROFILE && <ProfileTab initialProfile={userProfile} onSave={handleSaveProfile} />}
+          {!isSidebarOpen && <Sparkles className="w-6 h-6 text-blue-600 mx-auto" />}
         </div>
 
+        <nav className="flex-1 p-4 space-y-2 mt-4">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all group ${
+                activeTab === item.id 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+              title={item.label}
+            >
+              <item.icon className={`w-5 h-5 shrink-0 ${activeTab === item.id ? 'text-white' : 'group-hover:text-blue-600'}`} />
+              <span className={`font-medium whitespace-nowrap transition-all duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-slate-100">
+          <button 
+            onClick={() => logout()}
+            className="w-full flex items-center gap-3 p-3 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all group"
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            <span className={`font-medium transition-all duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>
+              Logout
+            </span>
+          </button>
+          
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="mt-4 w-full flex items-center justify-center p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
+          >
+            {isSidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
+          <h2 className="text-lg font-bold text-slate-800">
+            {navItems.find(n => n.id === activeTab)?.label}
+          </h2>
+          <div className="flex items-center gap-3">
+             <div className="text-right hidden sm:block">
+                <p className="text-xs font-bold text-slate-900">{profile.name || 'Set Name'}</p>
+                <p className="text-[10px] text-slate-400">{currentUser?.email}</p>
+             </div>
+             <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 font-bold text-xs">
+                {(profile.name || currentUser?.email || 'U').charAt(0).toUpperCase()}
+             </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+          <div className="max-w-7xl mx-auto h-full">
+            {activeTab === AppTab.GENERATOR && <GeneratorTab userProfile={profile} />}
+            {activeTab === AppTab.EMAIL_FINDER && <EmailFinderTab userProfile={profile} />}
+            {activeTab === AppTab.PROFILE && <ProfileTab initialProfile={profile} onSave={handleSaveProfile} />}
+          </div>
+        </div>
       </main>
-
-      <footer className="bg-white border-t border-slate-200 py-6 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 text-center text-slate-400 text-sm">
-          <p>© {new Date().getFullYear()} FlutterApply AI. Powered by Google Gemini & Firebase.</p>
-        </div>
-      </footer>
     </div>
   );
 };
 
-// Root App that switches between Login and Dashboard
-const App: React.FC = () => {
-  const { currentUser } = useAuth();
+const AuthWrapper: React.FC = () => {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return currentUser ? <Dashboard /> : <LoginScreen />;
 };
 
-// Wrap App in Provider
-export default () => (
-  <AuthProvider>
-    <App />
-  </AuthProvider>
-);
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AuthWrapper />
+    </AuthProvider>
+  );
+};
+
+export default App;

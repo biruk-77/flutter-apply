@@ -28,9 +28,10 @@ export interface JobListing {
   location: string;
   email: string | null;
   snippet: string;
-  fullDescription: string;
   url: string | null;
-  sourceSite: string; // e.g., "LinkedIn", "Indeed", "Company Website"
+  // Added optional fields used in GeneratorTab.tsx to satisfy the compiler and hold additional job data
+  fullDescription?: string;
+  sourceSite?: string;
 }
 
 export interface FoundEmail {
