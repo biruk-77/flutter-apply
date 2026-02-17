@@ -148,4 +148,65 @@ export const generateColdEmail = async (
   const prompt = `
     Write a highly tailored and professional cold email application for a Flutter job.
     RECIPIENT: ${recipient.name} at ${recipient.company}.
-    SENDER: ${profile.name}, ${profile.yearsExperience} yrs exp, Skills: ${profile
+    SENDER: ${profile.name}, ${profile.yearsExperience} yrs exp, Skills: ${profile.skills}. Bio: ${profile.bio}.
+    Output JSON with "subject" and "body".
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            subject: { type: Type.STRING },
+            body: { type: Type.STRING },
+          },
+          required: ["subject", "body"],
+        },
+      },
+    });
+    return JSON.parse(response.text || '{}') as GeneratedEmail;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Generates an application email based on specific job details and candidate profile.
+ */
+export const generateApplicationEmail = async (
+  profile: UserProfile,
+  job: JobDetails
+): Promise<GeneratedEmail> => {
+  const prompt = `
+    Generate a high-converting, personalized application email based on the following details.
+    CANDIDATE: ${profile.name}, ${profile.yearsExperience} yrs exp, Skills: ${profile.skills}.
+    JOB: ${job.companyName}, ${job.jobTitle}.
+    DESCRIPTION: ${job.jobDescription}
+    Output JSON with 'subject' and 'body'.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            subject: { type: Type.STRING },
+            body: { type: Type.STRING },
+          },
+          required: ["subject", "body"],
+        },
+      },
+    });
+    return JSON.parse(response.text || '{}') as GeneratedEmail;
+  } catch (error) {
+    throw error;
+  }
+};
