@@ -28,6 +28,7 @@ export const EmailFinderTab: React.FC<EmailFinderTabProps> = ({ userProfile }) =
   const [isInfinityMode, setIsInfinityMode] = useState(false);
   const stopSearchRef = useRef(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const searchIterationRef = useRef(0);
 
   const [selectedEmails, setSelectedEmails] = useState<FoundEmail[]>([]);
   const [isDrafting, setIsDrafting] = useState(false);
@@ -49,21 +50,46 @@ export const EmailFinderTab: React.FC<EmailFinderTabProps> = ({ userProfile }) =
     setIsSearching(true);
     stopSearchRef.current = false;
     
+    // Determine the actual query to send (Base or Variation)
+    let currentQuery = query;
+
     if (!isAppend) {
+        // New Search Reset
         setResults([]); 
         resultsRef.current = [];
-        setLogs(['Initializing search agent...']);
+        setLogs(['Initializing Deep Search Agent...']);
         setSelectedEmails([]);
+        searchIterationRef.current = 0;
     } else {
-        setLogs(prev => [...prev, '--- Starting next Infinity batch ---']);
+        // Infinity Mode: Rotate search terms to dig deeper
+        setLogs(prev => [...prev, '--- Starting next Deep Search batch ---']);
+        
+        const modifiers = [
+          " email contact",
+          " hiring manager",
+          " technical recruiter",
+          " jobs",
+          " talent acquisition",
+          " engineering lead",
+          " careers page",
+          " github profile email",
+          " linkedin summary email"
+        ];
+        
+        // Cycle through modifiers based on iteration count
+        const modifier = modifiers[searchIterationRef.current % modifiers.length];
+        currentQuery = `${query} ${modifier}`;
+        setLogs(prev => [...prev, `Applying search modifier: "${modifier.trim()}"`]);
+        searchIterationRef.current++;
     }
 
     try {
       const excludeList = isAppend 
-        ? resultsRef.current.map(r => r.name || r.company || '').filter(Boolean).slice(-40)
+        ? resultsRef.current.map(r => r.name || r.company || '').filter(Boolean).slice(-50)
         : [];
 
-      const stream = findContactEmailsStream(query, strategy, 10, location, excludeList);
+      // Request slightly more results to allow for better filtering
+      const stream = findContactEmailsStream(currentQuery, strategy, 15, location, excludeList);
       
       for await (const update of stream) {
         if (stopSearchRef.current) break;
@@ -71,6 +97,7 @@ export const EmailFinderTab: React.FC<EmailFinderTabProps> = ({ userProfile }) =
             setLogs(prev => [...prev.slice(-10), update.message]);
         } else if (update.type === 'result') {
             setResults(prev => {
+                // Avoid duplicates based on email
                 if (prev.some(e => e.email === update.data.email)) return prev;
                 return [...prev, update.data];
             });
@@ -79,13 +106,15 @@ export const EmailFinderTab: React.FC<EmailFinderTabProps> = ({ userProfile }) =
       
       // Handle Infinity logic
       if (isInfinityMode && !stopSearchRef.current) {
-         setLogs(prev => [...prev, 'Cooldown before next batch...']);
-         setTimeout(() => handleSearch(undefined, true), 3000);
+         setLogs(prev => [...prev, 'Analyzing results... Cooldown before next deep dive...']);
+         // Wait 4 seconds before next batch to be polite and allow UI to settle
+         setTimeout(() => handleSearch(undefined, true), 4000);
       } else {
         setIsSearching(false);
+        setLogs(prev => [...prev, 'Search complete.']);
       }
     } catch (err: any) {
-      setLogs(prev => [...prev, "Search interrupted."]);
+      setLogs(prev => [...prev, "Search interrupted or failed."]);
       setIsSearching(false);
     }
   };

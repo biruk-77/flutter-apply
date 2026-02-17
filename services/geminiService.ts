@@ -51,28 +51,50 @@ export const searchJobs = async (query: string): Promise<JobListing[]> => {
 };
 
 /**
- * Streams contact email findings by querying professional networks via Google Search.
+ * Streams contact emails by performing a Deep Search via Google Grounding.
  */
 export async function* findContactEmailsStream(
   query: string, 
   strategy: 'recruiters' | 'decision_makers' | 'active_hiring' = 'recruiters',
-  count: number = 10,
+  count: number = 15,
   location: string = '',
   exclude: string[] = []
 ): AsyncGenerator<StreamUpdate, void, unknown> {
   
+  // Construct a more aggressive search strategy based on the user's intent
+  let searchFocus = '';
+  switch (strategy) {
+    case 'recruiters':
+      searchFocus = 'Focus on Technical Recruiters, Talent Acquisition Heads, and HR Managers.';
+      break;
+    case 'decision_makers':
+      searchFocus = 'Focus on CTOs, VPs of Engineering, Engineering Managers, and Founders.';
+      break;
+    case 'active_hiring':
+      searchFocus = 'Focus on companies explicitly posting "We are hiring", "Job opening", or "Careers" for this role.';
+      break;
+  }
+
   const prompt = `
-    Find ~${count} professional contacts related to: "${query}" in "${location || 'Anywhere'}".
-    Focus: ${strategy}.
-    Return JSON objects, one per line.
+    DEEP SEARCH TASK: Find ~${count} high-quality professional contacts for: "${query}" ${location ? `in ${location}` : ''}.
+    ${searchFocus}
+
+    SEARCH STRATEGY:
+    1. PRIORITIZE findings with direct EMAIL ADDRESSES (patterns like @company.com, or gmail/outlook for freelancers).
+    2. If no direct email is visible, find the Decision Maker's Name and Company so we can guess the email later.
+    3. Look into LinkedIn summaries, GitHub profiles, Twitter/X bios, and Company "About Us" / "Team" pages.
+    4. ${exclude.length > 0 ? `CRITICAL: Do not include these previously found names/companies: ${exclude.slice(-50).join(', ')}.` : ''}
+
+    Output Format:
+    Return ONLY a stream of JSON objects, one per line. Do not wrap in a list.
     {
-      "email": "string",
+      "email": "string (The actual email found, or a highly probable format like firstname.lastname@company.com if confidence is high)",
       "type": "recruitment" | "personal" | "general",
-      "name": "string",
-      "role": "string",
+      "name": "string (Full Name)",
+      "role": "string (Job Title)",
       "company": "string",
-      "snippet": "string (Context found)",
-      "sourceUrl": "string"
+      "snippet": "string (The exact text/context where you found this lead, e.g., 'Posted on LinkedIn: looking for flutter devs...')",
+      "sourceUrl": "string (Link to profile/post)"
     }
   `;
 
@@ -95,11 +117,19 @@ export async function* findContactEmailsStream(
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
+        // Basic JSON validation to ensure we don't yield garbage
         if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
           try {
             const data = JSON.parse(trimmed) as FoundEmail;
             yield { type: 'result', data };
-          } catch (e) {}
+          } catch (e) {
+            // Ignore malformed lines
+          }
+        } else {
+             // Occasionally yield status updates if the model talks
+             if (trimmed.length > 10 && trimmed.length < 100 && !trimmed.includes('{')) {
+                 yield { type: 'log', message: trimmed };
+             }
         }
       }
     }
@@ -118,65 +148,4 @@ export const generateColdEmail = async (
   const prompt = `
     Write a highly tailored and professional cold email application for a Flutter job.
     RECIPIENT: ${recipient.name} at ${recipient.company}.
-    SENDER: ${profile.name}, ${profile.yearsExperience} yrs exp, Skills: ${profile.skills}. Bio: ${profile.bio}.
-    Output JSON with "subject" and "body".
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            subject: { type: Type.STRING },
-            body: { type: Type.STRING },
-          },
-          required: ["subject", "body"],
-        },
-      },
-    });
-    return JSON.parse(response.text || '{}') as GeneratedEmail;
-  } catch (error) {
-    throw error;
-  }
-};
-
-/**
- * Generates an application email based on specific job details and candidate profile.
- */
-export const generateApplicationEmail = async (
-  profile: UserProfile,
-  job: JobDetails
-): Promise<GeneratedEmail> => {
-  const prompt = `
-    Generate a high-converting, personalized application email based on the following details.
-    CANDIDATE: ${profile.name}, ${profile.yearsExperience} yrs exp, Skills: ${profile.skills}.
-    JOB: ${job.companyName}, ${job.jobTitle}.
-    DESCRIPTION: ${job.jobDescription}
-    Output JSON with 'subject' and 'body'.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            subject: { type: Type.STRING },
-            body: { type: Type.STRING },
-          },
-          required: ["subject", "body"],
-        },
-      },
-    });
-    return JSON.parse(response.text || '{}') as GeneratedEmail;
-  } catch (error) {
-    throw error;
-  }
-};
+    SENDER: ${profile.name}, ${profile.yearsExperience} yrs exp, Skills: ${profile
